@@ -1,13 +1,14 @@
 #include <ncurses.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 #include <locale.h>
 
 #include "common.h"
 #include "menu.h"
 #include "game.h"
 
-#define TARGET_FRAME_TIME 0.001
+#define TARGET_FRAME_TIME 0.01
 
 WINDOW *MenuWin, *GameWin;
 
@@ -42,23 +43,19 @@ int main()
     // Init game obj
     InitGame();
 
-    
-    int first = 1;
-
-    time_t startMillis;
-    double frameTime;
+    long long start, frameTime;
     while (GetGameState() != QUIT)
     {
-        startMillis = time(NULL);
+        start = timeInMilliseconds();
 
         if (Update() || SwitchedState())
             Draw();
 
-        frameTime = difftime(time(NULL), startMillis);
-        if (frameTime < TARGET_FRAME_TIME)
-            usleep((TARGET_FRAME_TIME - frameTime) * 1000000);
+        frameTime = timeInMilliseconds() - start;
+        if (frameTime < TARGET_FRAME_TIME * 1000)
+            usleep((TARGET_FRAME_TIME * 1000 - frameTime) * 1000);
 
-        deltaTime = difftime(time(NULL), startMillis);
+        deltaTime = (double)(timeInMilliseconds() - start) / 1000;
     }
 
     endwin();
@@ -87,6 +84,9 @@ int Update()
 
 void Draw()
 {
+    mvprintw(1, 1, "%f", deltaTime);
+    refresh();
+
     switch (GetGameState())
     {
         case QUIT:

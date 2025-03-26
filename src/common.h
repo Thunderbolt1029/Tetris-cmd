@@ -15,3 +15,5 @@ typedef enum GameState_type
 int SwitchedState();
 GameState GetGameState();
 void SetGameState(GameState);
+
+long long timeInMilliseconds(void);

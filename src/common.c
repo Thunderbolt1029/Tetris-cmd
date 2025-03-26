@@ -1,4 +1,5 @@
 #include <ncurses.h>
+#include <sys/time.h>
 
 #include "common.h"
 
@@ -20,4 +21,12 @@ void SetGameState(GameState value)
 { 
     switchedState = 1;
     currentState = value;
+}
+
+long long timeInMilliseconds(void) 
+{
+    struct timeval tv;
+
+    gettimeofday(&tv,NULL);
+    return (((long long)tv.tv_sec)*1000)+(tv.tv_usec/1000);
 }

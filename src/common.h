@@ -12,8 +12,10 @@ typedef enum GameState_type
     GAME
 } GameState;
 
-int SwitchedState();
-GameState GetGameState();
+int SwitchedState(void);
+GameState GetGameState(void);
 void SetGameState(GameState);
 
 long long timeInMilliseconds(void);
+
+void shuffle(int *array, size_t arraySize);

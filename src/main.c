@@ -14,10 +14,10 @@ WINDOW *MenuWin, *GameWin;
 
 double deltaTime = 0;
 
-int Update();
-void Draw();
+int Update(void);
+void Draw(void);
 
-int main()
+int main(int argc, char *argv[])
 {
     // Init
     setlocale(LC_ALL, "");
@@ -63,7 +63,7 @@ int main()
     return 0;
 }
 
-int Update()
+int Update(void)
 {
     switch (GetGameState())
     {
@@ -82,11 +82,8 @@ int Update()
     }
 }
 
-void Draw()
+void Draw(void)
 {
-    mvprintw(1, 1, "%f", deltaTime);
-    refresh();
-
     switch (GetGameState())
     {
         case QUIT:

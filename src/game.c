@@ -3,26 +3,75 @@
 #include "common.h"
 #include "game.h"
 
+
 #define PLAY_WIDTH 10
 #define PLAY_HEIGHT 20
 #define DRAW_SCALE 2
 
 #define GAME_SPEED 0.5
+#define BAG_SIZE 7
 
-int level[PLAY_HEIGHT+2][PLAY_WIDTH];
-double moveDownTime = GAME_SPEED;
-
-void MoveTilesDown();
-
-void InitGame() 
+#define LINE_SCORE_1 40
+#define LINE_SCORE_2 100
+#define LINE_SCORE_3 300
+#define LINE_SCORE_4 1200
+int LineScore(int noLines)
 {
-    int count = 0;
-    int y, x;
-    for (x = 0; x < PLAY_WIDTH; x++)
-        level[0][x] = 1;
+    switch (noLines)
+    {
+        case 0: return 0;
+        case 1: return LINE_SCORE_1;
+        case 2: return LINE_SCORE_2;
+        case 3: return LINE_SCORE_3;
+        case 4: return LINE_SCORE_4;
+        
+        default: return -1;
+    }
 }
 
-int UpdateGame(WINDOW* win, double deltaTime) 
+
+typedef enum PieceType_type {
+    T_PIECE,
+    L_PIECE,
+    J_PIECE,
+    I_PIECE,
+    S_PIECE,
+    Z_PIECE,
+    O_PIECE
+} PieceType;
+
+
+int score = 0;
+int level[PLAY_HEIGHT + 2][PLAY_WIDTH];
+double moveDownTime = GAME_SPEED;
+
+PieceType currentPieceType;
+int currentRotation;
+int currentPiece[4][2];
+
+int pieceFromBag = 0;
+PieceType pieceBag[BAG_SIZE];
+
+
+void MoveTilesDown(int height);
+int MovePieceDown(void);
+void HardDrop(void);
+void MovePieceLaterally(int dir);
+
+int RemoveClearedLines(void);
+
+void AddPiece(PieceType);
+void RotatePiece(int dir);
+void RefreshBag(void);
+
+
+void InitGame(void)
+{
+    RefreshBag();
+    AddPiece(pieceBag[pieceFromBag++]);
+}
+
+int UpdateGame(WINDOW *win, double deltaTime)
 {
     int drawFrame = false;
 
@@ -37,55 +86,611 @@ int UpdateGame(WINDOW* win, double deltaTime)
         return false;
     }
 
-    if (inp != -1)
+    switch (inp)
+    {
+    case KEY_DOWN:
+        MovePieceDown();
         drawFrame = true;
+        break;
+    case ' ':
+        HardDrop();
+        drawFrame = true;
+        break;
+
+    case KEY_LEFT:
+        MovePieceLaterally(-1);
+        drawFrame = true;
+        break;
+    case KEY_RIGHT:
+        MovePieceLaterally(1);
+        drawFrame = true;
+        break;
+
+    case KEY_UP:
+        RotatePiece(1);
+        drawFrame = true;
+        break;
+    }
 
     moveDownTime -= deltaTime;
-    if (moveDownTime < 0) {
+    if (moveDownTime < 0)
+    {
         moveDownTime = GAME_SPEED;
 
-        MoveTilesDown();
+        if (MovePieceDown()) 
+        {
+            int linesCleared = 0, lines;
+            lines = RemoveClearedLines();
+            if (lines > 0) RemoveClearedLines();
+            score += LineScore(lines);
+
+            AddPiece(pieceBag[pieceFromBag++]);
+            if (pieceFromBag == BAG_SIZE)
+            {
+                pieceFromBag = 0;
+                RefreshBag();
+            }
+        }
         drawFrame = true;
     }
 
     return drawFrame;
 }
 
-void DrawGame(WINDOW* win) 
+void DrawGame(WINDOW *win)
 {
     box(win, 0, 0);
 
+    mvwprintw(win, 2, 2, "Score:");
+    mvwprintw(win, 3, 2, "%d", score);  
+
     int top, left;
-    getmidyx(win, PLAY_HEIGHT*DRAW_SCALE, PLAY_WIDTH*DRAW_SCALE*2, top, left);
+    getmidyx(win, PLAY_HEIGHT * DRAW_SCALE, PLAY_WIDTH * DRAW_SCALE * 2, top, left);
     int y, x;
 
-    for (x = 0; x < PLAY_WIDTH * DRAW_SCALE * 2; x++) {
+    for (x = 0; x < PLAY_WIDTH * DRAW_SCALE * 2; x++)
+    {
         mvwaddch(win, top - 1, left + x, ACS_HLINE);
-        mvwaddch(win, top + PLAY_HEIGHT*DRAW_SCALE, left + x, ACS_HLINE);
+        mvwaddch(win, top + PLAY_HEIGHT * DRAW_SCALE, left + x, ACS_HLINE);
     }
-    for (y = 0; y < PLAY_WIDTH * DRAW_SCALE * 2; y++) {
+    for (y = 0; y < PLAY_WIDTH * DRAW_SCALE * 2; y++)
+    {
         mvwaddch(win, top + y, left - 1, ACS_VLINE);
         mvwaddch(win, top + y, left + PLAY_HEIGHT * DRAW_SCALE, ACS_VLINE);
     }
-    mvwaddch(win, top - 1,                      left - 1,                        ACS_ULCORNER);
-    mvwaddch(win, top - 1,                      left + PLAY_HEIGHT * DRAW_SCALE, ACS_URCORNER);
-    mvwaddch(win, top + PLAY_HEIGHT*DRAW_SCALE, left - 1,                        ACS_LLCORNER);
-    mvwaddch(win, top + PLAY_HEIGHT*DRAW_SCALE, left + PLAY_HEIGHT * DRAW_SCALE, ACS_LRCORNER);
-
+    mvwaddch(win, top - 1, left - 1, ACS_ULCORNER);
+    mvwaddch(win, top - 1, left + PLAY_HEIGHT * DRAW_SCALE, ACS_URCORNER);
+    mvwaddch(win, top + PLAY_HEIGHT * DRAW_SCALE, left - 1, ACS_LLCORNER);
+    mvwaddch(win, top + PLAY_HEIGHT * DRAW_SCALE, left + PLAY_HEIGHT * DRAW_SCALE, ACS_LRCORNER);
 
     for (y = 0; y < PLAY_HEIGHT * DRAW_SCALE; y++)
         for (x = 0; x < PLAY_WIDTH * DRAW_SCALE * 2; x++)
-            mvwaddch(win, top + y, left + x, level[y/DRAW_SCALE][x/(DRAW_SCALE*2)] ? ' '|A_REVERSE : ' ');
+            mvwaddch(win, top + y, left + x, level[y / DRAW_SCALE + 2][x / (DRAW_SCALE * 2)] ? ' ' | A_REVERSE : ' ');
 
     wrefresh(win);
 }
 
-void MoveTilesDown() {
-    int x, y;
-    for (y = PLAY_HEIGHT-1; y >= 0; y--)
-        for (x = 0; x < PLAY_WIDTH; x++) {
-            // Do some checking whether you can do this first
-            level[y+1][x] = level[y][x];
-            level[y][x] = 0;
+void MoveTilesDown(int height)
+{
+    for (int y = height; y >= 0; y--)
+        for (int x = 0; x < PLAY_WIDTH; x++)
+            if (!level[y + 1][x])
+            {
+                level[y + 1][x] = level[y][x];
+                level[y][x] = 0;
+            }
+}
+
+int MovePieceDown(void)
+{
+    int x, y, i;
+
+    int levelCopy[PLAY_HEIGHT + 2][PLAY_WIDTH];
+    for (y = 0; y < PLAY_HEIGHT+2; y++)
+        for (x = 0; x < PLAY_WIDTH; x++)
+            levelCopy[y][x] = level[y][x];
+
+    for (i = 0; i < 4; i++)
+        levelCopy[currentPiece[i][0]][currentPiece[i][1]] = 0;
+
+    for (i = 0; i < 4; i++)
+    {
+        y = currentPiece[i][0], x = currentPiece[i][1];
+        if (y > PLAY_HEIGHT || levelCopy[y + 1][x]) return true;
+    }
+
+    for (i = 0; i < 4; i++)
+        level[currentPiece[i][0]][currentPiece[i][1]] = 0;
+    for (i = 0; i < 4; i++)
+        level[++currentPiece[i][0]][currentPiece[i][1]] = 1;
+
+    return false;
+}
+
+void HardDrop(void)
+{
+    while (!MovePieceDown()) {}
+}
+
+void MovePieceLaterally(int dir)
+{
+    int x, y, i;
+
+    for (i = 0; i < 4; i++)
+    {
+        x = currentPiece[i][1] + dir;
+        if (x < 0 || x >= PLAY_WIDTH)
+            return;
+    }
+
+    int levelCopy[PLAY_HEIGHT + 2][PLAY_WIDTH];
+    for (y = 0; y < PLAY_HEIGHT+2; y++)
+        for (x = 0; x < PLAY_WIDTH; x++)
+            levelCopy[y][x] = level[y][x];
+
+    for (i = 0; i < 4; i++)
+        levelCopy[currentPiece[i][0]][currentPiece[i][1]] = 0;
+    for (i = 0; i < 4; i++)
+    {
+        y = currentPiece[i][0], x = currentPiece[i][1];
+
+        if (levelCopy[y][x+dir] == 1)
+            return;
+    }
+
+    for (i = 0; i < 4; i++)
+        level[currentPiece[i][0]][currentPiece[i][1]] = 0;
+    for (i = 0; i < 4; i++)
+    {
+        y = currentPiece[i][0], x = currentPiece[i][1];
+
+        currentPiece[i][1] += dir;
+        level[y][x+dir] = 1;
+    }
+}
+
+int RemoveClearedLines(void)
+{
+    int x, y, i, skip, noLines = 0, bottomLine = 0;
+
+    // Check for full lines
+    for (y = 0; y < PLAY_HEIGHT+2; y++)
+    {
+        skip = false;
+        for (x = 0; x < PLAY_WIDTH; x++)
+        {
+            if (!level[y][x])
+            {
+                skip = true;
+                break;
+            }
         }
+        if (skip) continue;
+
+        noLines++;
+        bottomLine = y;
+    }
+
+    // Clear lines
+    for (y = bottomLine; y > bottomLine - noLines; y--)
+        for (x = 0; x < PLAY_WIDTH; x++)
+            level[y][x] = 0;
+
+    // Drop lines
+    for (i = 0; i < noLines; i++)
+        MoveTilesDown(bottomLine);
+
+    return noLines;
+}
+
+void AddPiece(PieceType piece)
+{
+    currentPieceType = piece;
+    currentRotation = 0;
+
+    switch (piece)
+    {
+    case T_PIECE:
+        currentPiece[0][0] = 0;
+        currentPiece[0][1] = 5;
+
+        currentPiece[1][0] = 1;
+        currentPiece[1][1] = 4;
+
+        currentPiece[2][0] = 1;
+        currentPiece[2][1] = 5;
+
+        currentPiece[3][0] = 1;
+        currentPiece[3][1] = 6;
+        break;
+
+    case L_PIECE:
+        currentPiece[0][0] = 0;
+        currentPiece[0][1] = 6;
+
+        currentPiece[1][0] = 1;
+        currentPiece[1][1] = 4;
+
+        currentPiece[2][0] = 1;
+        currentPiece[2][1] = 5;
+
+        currentPiece[3][0] = 1;
+        currentPiece[3][1] = 6;
+        break;
+
+    case J_PIECE:
+        currentPiece[0][0] = 0;
+        currentPiece[0][1] = 4;
+
+        currentPiece[1][0] = 1;
+        currentPiece[1][1] = 4;
+
+        currentPiece[2][0] = 1;
+        currentPiece[2][1] = 5;
+
+        currentPiece[3][0] = 1;
+        currentPiece[3][1] = 6;
+        break;
+
+    case I_PIECE:
+        currentPiece[0][0] = 1;
+        currentPiece[0][1] = 3;
+
+        currentPiece[1][0] = 1;
+        currentPiece[1][1] = 4;
+
+        currentPiece[2][0] = 1;
+        currentPiece[2][1] = 5;
+
+        currentPiece[3][0] = 1;
+        currentPiece[3][1] = 6;
+        break;
+
+    case S_PIECE:
+        currentPiece[0][0] = 0;
+        currentPiece[0][1] = 5;
+
+        currentPiece[1][0] = 1;
+        currentPiece[1][1] = 4;
+
+        currentPiece[2][0] = 1;
+        currentPiece[2][1] = 5;
+
+        currentPiece[3][0] = 0;
+        currentPiece[3][1] = 6;
+        break;
+
+    case Z_PIECE:
+        currentPiece[0][0] = 0;
+        currentPiece[0][1] = 4;
+
+        currentPiece[1][0] = 0;
+        currentPiece[1][1] = 3;
+
+        currentPiece[2][0] = 1;
+        currentPiece[2][1] = 4;
+
+        currentPiece[3][0] = 1;
+        currentPiece[3][1] = 5;
+        break;
+
+    case O_PIECE:
+        currentPiece[1][0] = 0;
+        currentPiece[1][1] = 4;
+
+        currentPiece[2][0] = 0;
+        currentPiece[2][1] = 5;
+
+        currentPiece[0][0] = 1;
+        currentPiece[0][1] = 4;
+
+        currentPiece[3][0] = 1;
+        currentPiece[3][1] = 5;
+        break;
+    }
+}
+
+const int CLOCK_ROTATE_DISPLACEMENTS[7][4][4][2] = {
+    // T_PIECE
+    {
+        // 0->1
+        { {1, 1}, {1, -1}, {0, 0}, {-1, 1} },
+
+        // 1->2
+        { {-1, 1}, {1, 1}, {0, 0}, {-1, -1} },
+
+        // 2->3
+        { {-1, -1}, {-1, 1}, {0, 0}, {1, -1} },
+
+        // 3->0
+        { {1, -1}, {-1, -1}, {0, 0}, {1, 1} }
+    },
+
+    // L_PIECE
+    {
+        // 0->1
+        { {0, 2}, {1, -1}, {0, 0}, {-1, 1} },
+
+        // 1->2
+        { {-2, 0}, {1, 1}, {0, 0}, {-1, -1} },
+
+        // 2->3
+        { {0, -2}, {-1, 1}, {0, 0}, {1, -1} },
+
+        // 3->0
+        { {2, 0}, {-1, -1}, {0, 0}, {1, 1} }
+    },
+
+    // J_PIECE
+    {
+        // 0->1
+        { {2, 0}, {1, -1}, {0, 0}, {-1, 1} },
+
+        // 1->2
+        { {0, 2}, {1, 1}, {0, 0}, {-1, -1} },
+
+        // 2->3
+        { {-2, 0}, {-1, 1}, {0, 0}, {1, -1} },
+
+        // 3->0
+        { {0, -2}, {-1, -1}, {0, 0}, {1, 1} }
+    },
+
+    // I_PIECE
+    {
+        // 0->1
+        { {2, -1}, {1, 0}, {0, 1}, {-1, 2} },
+
+        // 1->2
+        { {1, 2}, {0, 1}, {-1, 0}, {-2, -1} },
+
+        // 2->3
+        { {-2, 1}, {-1, 0}, {0, -1}, {1, -2} },
+
+        // 3->0
+        { {-1, -2}, {0, -1}, {1, 0}, {2, 1} }
+    },
+
+    // S_PIECE
+    {
+        // 0->1
+        { {1, 1}, {1, -1}, {0, 0}, {0, 2} },
+
+        // 1->2
+        { {-1, 1}, {1, 1}, {0, 0}, {-2, 0} },
+
+        // 2->3
+        { {-1, -1}, {-1, 1}, {0, 0}, {0, -2} },
+
+        // 3->0
+        { {1, -1}, {-1, -1}, {0, 0}, {2, 0} }
+    },
+
+    // Z_PIECE
+    {
+        // 0->1
+        { {1, 1}, {2, 0}, {0, 0}, {-1, 1} },
+
+        // 1->2
+        { {-1, 1}, {0, 2}, {0, 0}, {-1, -1} },
+
+        // 2->3
+        { {-1, -1}, {-2, 0}, {0, 0}, {1, -1} },
+
+        // 3->0
+        { {1, -1}, {0, -2}, {0, 0}, {1, 1} }
+    },
+
+    // O_PIECE
+    {
+        // 0->1
+        { {0, 0}, {0, 0}, {0, 0}, {0, 0} },
+
+        // 1->2
+        { {0, 0}, {0, 0}, {0, 0}, {0, 0} },
+        
+        // 2->3
+        { {0, 0}, {0, 0}, {0, 0}, {0, 0} },
+        
+        // 3->0
+        { {0, 0}, {0, 0}, {0, 0}, {0, 0} }
+    }
+};
+const int KICK_CHECKS[2][4][4][2] = {
+    // J, L, T, S, Z
+    {
+        // 0->1
+        {
+            // Test 2
+            { -1, 0 },
+
+            // Test 3
+            { -1, 1 },
+
+            // Test 4
+            { 0, -2 },
+            
+            // Test 5
+            { -1, -2 }
+        },
+
+        // 1->2
+        {
+            // Test 2
+            { 1, 0 },
+
+            // Test 3
+            { 1, -1 },
+
+            // Test 4
+            { 0, 2 },
+            
+            // Test 5
+            { 1, 2 }
+        },
+
+        // 2->3
+        {
+            // Test 2
+            { 1, 0 },
+
+            // Test 3
+            { 1, 1 },
+
+            // Test 4
+            { 0, -2 },
+            
+            // Test 5
+            { 1, -2 }
+        },
+
+        // 3->0
+        {
+            // Test 2
+            { -1, 0 },
+
+            // Test 3
+            { -1, -1 },
+
+            // Test 4
+            { 0, 2 },
+            
+            // Test 5
+            { -1, 2 }
+        }
+    },
+    // I
+    {
+        // 0->1
+        {
+            // Test 2
+            { -2, 0 },
+
+            // Test 3
+            { 1, 0 },
+
+            // Test 4
+            { -2, -1 },
+            
+            // Test 5
+            { 1, 2 }
+        },
+
+        // 1->2
+        {
+            // Test 2
+            { -1, 0 },
+
+            // Test 3
+            { 2, 0 },
+
+            // Test 4
+            { -1, 2 },
+            
+            // Test 5
+            { 2, -1 }
+        },
+
+        // 2->3
+        {
+            // Test 2
+            { 2, 0 },
+
+            // Test 3
+            { -1, 0 },
+
+            // Test 4
+            { 2, 1 },
+            
+            // Test 5
+            { -1, -2 }
+        },
+
+        // 3->0
+        {
+            // Test 2
+            { 1, 0 },
+
+            // Test 3
+            { -2, 0 },
+
+            // Test 4
+            { 1, -2 },
+            
+            // Test 5
+            { -2, 1 }
+        }
+    }
+};
+void RotatePiece(int dir)
+{
+    int x, y, i;
+
+    int levelCopy[PLAY_HEIGHT + 2][PLAY_WIDTH];
+    for (y = 0; y < PLAY_HEIGHT+2; y++)
+        for (x = 0; x < PLAY_WIDTH; x++)
+            levelCopy[y][x] = level[y][x];
+    
+    int kickTest;
+    for (kickTest = -1; kickTest < 4; kickTest++)
+    {
+        int pieceCopy[4][2];
+        for (i = 0; i < 4; i++)
+        {
+            pieceCopy[i][0] = currentPiece[i][0];
+            pieceCopy[i][1] = currentPiece[i][1];
+        }
+
+        for (i = 0; i < 4; i++)
+            levelCopy[pieceCopy[i][0]][pieceCopy[i][1]] = 0;
+
+        int valid = true;
+        for (i = 0; i < 4; i++)
+        {
+            pieceCopy[i][0] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][1];
+            pieceCopy[i][1] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][0];
+        
+            if (kickTest != -1 && currentPieceType != O_PIECE) 
+            {
+                pieceCopy[i][0] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][1];
+                pieceCopy[i][1] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][0];
+            }
+
+            if (levelCopy[pieceCopy[i][0]][pieceCopy[i][1]] == 1)
+            {
+                valid = false;
+                break;
+            }
+        }
+        if (valid)
+            break;
+    }
+    if (kickTest == 4)
+        return;
+
+    for (i = 0; i < 4; i++)
+        level[currentPiece[i][0]][currentPiece[i][1]] = 0;
+    for (i = 0; i < 4; i++)
+    {
+        currentPiece[i][0] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][1];
+        currentPiece[i][1] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][0];
+
+        if (kickTest != -1 && currentPieceType != O_PIECE) 
+        {
+            currentPiece[i][0] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][1];
+            currentPiece[i][1] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][0];
+        }
+    
+        level[currentPiece[i][0]][currentPiece[i][1]] = 1;
+    }
+    currentRotation++;
+    currentRotation %= 4;
+}
+
+void RefreshBag(void)
+{
+    for (int i = 0; i < BAG_SIZE; i++)
+        pieceBag[i] = i%7;
+
+    shuffle(pieceBag, BAG_SIZE);
 }

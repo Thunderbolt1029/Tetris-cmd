@@ -1,3 +1,5 @@
+#include <ncurses.h>
+
 #define GAME_WIDTH 100
 #define GAME_HEIGHT 50
 

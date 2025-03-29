@@ -1,4 +1,3 @@
-#include <ncurses.h>
 #include <string.h>
 
 #include "menu.h"
@@ -28,12 +27,12 @@ int UpdateMenu(WINDOW* win)
 {
     int drawFrame = false;
 
-    int inp = 0;
+    int inp;
     inp = wgetch(win);
 
     if (inp == 'q' || inp == 'Q')
     {
-        SetGameState(QUIT);
+        SetGameState(QUIT, win);
         return false;
     }
 
@@ -53,7 +52,7 @@ int UpdateMenu(WINDOW* win)
 
     case '\n':
     case KEY_ENTER:
-        SetGameState(choiceStates[selChoice]);
+        SetGameState(choiceStates[selChoice], win);
         break;
     }
 

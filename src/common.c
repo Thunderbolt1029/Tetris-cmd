@@ -1,8 +1,60 @@
-#include <ncurses.h>
 #include <sys/time.h>
 #include <stdlib.h>
 
 #include "common.h"
+
+#define LARGE(x, y) switch (y) { case 0: return LARGE_##x##0; case 1: return LARGE_##x##1; case 2: return LARGE_##x##2; case 3: return LARGE_##x##3; }
+
+#define LARGE_00 " ___ "
+#define LARGE_01 "|   |"
+#define LARGE_02 "| | |"
+#define LARGE_03 "|___|"
+
+#define LARGE_10 "  __ "
+#define LARGE_11 " /  |"
+#define LARGE_12 "  | |"
+#define LARGE_13 "  |_|"
+
+#define LARGE_20 " ___ "
+#define LARGE_21 "|_  |"
+#define LARGE_22 "|  _|"
+#define LARGE_23 "|___|"
+
+#define LARGE_30 " ___ "
+#define LARGE_31 "|_  |"
+#define LARGE_32 "|_  |"
+#define LARGE_33 "|___|"
+
+#define LARGE_40 " ___ "
+#define LARGE_41 "| | |"
+#define LARGE_42 "|_  |"
+#define LARGE_43 "  |_|"
+
+#define LARGE_50 " ___ "
+#define LARGE_51 "|  _|"
+#define LARGE_52 "|_  |"
+#define LARGE_53 "|___|"
+
+#define LARGE_60 " ___ "
+#define LARGE_61 "|  _|"
+#define LARGE_62 "| . |"
+#define LARGE_63 "|___|"
+
+#define LARGE_70 " ___ "
+#define LARGE_71 "|_  |"
+#define LARGE_72 "  | |"
+#define LARGE_73 "  |_|"
+
+#define LARGE_80 " ___ "
+#define LARGE_81 "| . |"
+#define LARGE_82 "| . |"
+#define LARGE_83 "|___|"
+
+#define LARGE_90 " ___ "
+#define LARGE_91 "| . |"
+#define LARGE_92 "|_  |"
+#define LARGE_93 "|___|"
+
 
 GameState currentState = MENU;
 
@@ -18,8 +70,14 @@ GameState GetGameState(void)
 {
     return currentState;
 }
-void SetGameState(GameState value) 
+void SetGameState(GameState value, WINDOW *win) 
 { 
+    if (win != NULL)
+    {
+        werase(win);
+        wrefresh(win);
+    }
+    
     switchedState = 1;
     currentState = value;
 }
@@ -48,5 +106,25 @@ void shuffle(int *array, size_t n)
           array[j] = array[i];
           array[i] = t;
         }
+    }
+}
+
+char *LargeNum(int num, int i)
+{
+    if (num < 0 || num > 9 || i < 0 || i > 3)
+        return NULL;
+
+    switch (num)
+    {
+    case 0: LARGE(0, i)
+    case 1: LARGE(1, i)
+    case 2: LARGE(2, i)
+    case 3: LARGE(3, i)
+    case 4: LARGE(4, i)
+    case 5: LARGE(5, i)
+    case 6: LARGE(6, i)
+    case 7: LARGE(7, i)
+    case 8: LARGE(8, i)
+    case 9: LARGE(9, i)
     }
 }

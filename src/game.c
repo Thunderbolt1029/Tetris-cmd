@@ -1,7 +1,9 @@
-#include <ncurses.h>
+#include <stdlib.h>
+#include <time.h>
 
 #include "common.h"
 #include "game.h"
+#include "lost.h"
 
 
 #define PLAY_WIDTH 10
@@ -41,15 +43,15 @@ typedef enum PieceType_type {
 } PieceType;
 
 
-int score = 0;
+int score, linesCleared;
 int level[PLAY_HEIGHT + 2][PLAY_WIDTH];
-double moveDownTime = GAME_SPEED;
+double moveDownTime;
 
 PieceType currentPieceType;
 int currentRotation;
 int currentPiece[4][2];
 
-int pieceFromBag = 0;
+int pieceFromBag;
 PieceType pieceBag[BAG_SIZE];
 
 
@@ -67,6 +69,17 @@ void RefreshBag(void);
 
 void InitGame(void)
 {
+    srand(time(NULL));
+
+    score = 0;
+    linesCleared = 0;
+
+    for (int x = 0; x < PLAY_WIDTH; x++)
+        for (int y = 0; y < PLAY_HEIGHT+2; y++)
+            level[y][x] = 0;
+
+    moveDownTime = GAME_SPEED;
+
     RefreshBag();
     AddPiece(pieceBag[pieceFromBag++]);
 }
@@ -75,14 +88,13 @@ int UpdateGame(WINDOW *win, double deltaTime)
 {
     int drawFrame = false;
 
-    int inp = 0;
+    int inp;
     inp = wgetch(win);
 
     if (inp == 'q' || inp == 'Q')
     {
-        SetGameState(MENU);
-        werase(win);
-        wrefresh(win);
+        InitGame();
+        SetGameState(MENU, win);
         return false;
     }
 
@@ -119,10 +131,26 @@ int UpdateGame(WINDOW *win, double deltaTime)
 
         if (MovePieceDown()) 
         {
-            int linesCleared = 0, lines;
+            int lines;
             lines = RemoveClearedLines();
             if (lines > 0) RemoveClearedLines();
             score += LineScore(lines);
+            linesCleared += lines;
+
+            int lost = false;
+            for (int x = 0; x < PLAY_WIDTH; x++)
+                if (level[0][x] || level[1][x])
+                {
+                    lost = true;
+                    break;
+                }
+            if (lost)
+            {
+                SendGameInfo((GameInfo){score, linesCleared});
+                InitGame();
+                SetGameState(LOST, win);
+                return false;
+            }
 
             AddPiece(pieceBag[pieceFromBag++]);
             if (pieceFromBag == BAG_SIZE)
@@ -141,8 +169,14 @@ void DrawGame(WINDOW *win)
 {
     box(win, 0, 0);
 
-    mvwprintw(win, 2, 2, "Score:");
-    mvwprintw(win, 3, 2, "%d", score);  
+    char Score[10];
+    snprintf(Score, 10, "%d", score);
+    int i;
+    for (i = 0; i < 10; i++)
+        if (Score[i] == '\0') break;
+    for (i--; i >= 0; i--)
+        for (int j = 0; j < 4; j++)
+                mvwprintw(win, 1+j, 3+i*4, "%s", LargeNum(Score[i]-48, j));
 
     int top, left;
     getmidyx(win, PLAY_HEIGHT * DRAW_SCALE, PLAY_WIDTH * DRAW_SCALE * 2, top, left);
@@ -165,7 +199,11 @@ void DrawGame(WINDOW *win)
 
     for (y = 0; y < PLAY_HEIGHT * DRAW_SCALE; y++)
         for (x = 0; x < PLAY_WIDTH * DRAW_SCALE * 2; x++)
+        {
+            wattron(win, COLOR_PAIR(level[y / DRAW_SCALE + 2][x / (DRAW_SCALE * 2)]));
             mvwaddch(win, top + y, left + x, level[y / DRAW_SCALE + 2][x / (DRAW_SCALE * 2)] ? ' ' | A_REVERSE : ' ');
+            wattroff(win, COLOR_PAIR(level[y / DRAW_SCALE + 2][x / (DRAW_SCALE * 2)]));
+        }
 
     wrefresh(win);
 }
@@ -202,7 +240,7 @@ int MovePieceDown(void)
     for (i = 0; i < 4; i++)
         level[currentPiece[i][0]][currentPiece[i][1]] = 0;
     for (i = 0; i < 4; i++)
-        level[++currentPiece[i][0]][currentPiece[i][1]] = 1;
+        level[++currentPiece[i][0]][currentPiece[i][1]] = currentPieceType + 1;
 
     return false;
 }
@@ -210,6 +248,7 @@ int MovePieceDown(void)
 void HardDrop(void)
 {
     while (!MovePieceDown()) {}
+    moveDownTime = 0;
 }
 
 void MovePieceLaterally(int dir)
@@ -234,7 +273,7 @@ void MovePieceLaterally(int dir)
     {
         y = currentPiece[i][0], x = currentPiece[i][1];
 
-        if (levelCopy[y][x+dir] == 1)
+        if (levelCopy[y][x+dir])
             return;
     }
 
@@ -245,7 +284,7 @@ void MovePieceLaterally(int dir)
         y = currentPiece[i][0], x = currentPiece[i][1];
 
         currentPiece[i][1] += dir;
-        level[y][x+dir] = 1;
+        level[y][x+dir] = currentPieceType + 1;
     }
 }
 
@@ -656,7 +695,8 @@ void RotatePiece(int dir)
                 pieceCopy[i][1] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][0];
             }
 
-            if (levelCopy[pieceCopy[i][0]][pieceCopy[i][1]] == 1)
+            int oobKick = pieceCopy[i][0] < 0 || pieceCopy[i][0] >= PLAY_HEIGHT + 2 || pieceCopy[i][1] < 0 || pieceCopy[i][1] >= PLAY_WIDTH;
+            if (oobKick || levelCopy[pieceCopy[i][0]][pieceCopy[i][1]])
             {
                 valid = false;
                 break;
@@ -681,7 +721,7 @@ void RotatePiece(int dir)
             currentPiece[i][1] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][0];
         }
     
-        level[currentPiece[i][0]][currentPiece[i][1]] = 1;
+        level[currentPiece[i][0]][currentPiece[i][1]] = currentPieceType + 1;
     }
     currentRotation++;
     currentRotation %= 4;
@@ -689,8 +729,9 @@ void RotatePiece(int dir)
 
 void RefreshBag(void)
 {
+    pieceFromBag = 0;
     for (int i = 0; i < BAG_SIZE; i++)
         pieceBag[i] = i%7;
 
-    shuffle(pieceBag, BAG_SIZE);
+    shuffle((int*)pieceBag, BAG_SIZE);
 }

@@ -1,3 +1,5 @@
+#include <ncurses.h>
+
 #define MENU_WIDTH 80
 #define MENU_HEIGHT 30
 

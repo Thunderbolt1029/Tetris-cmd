@@ -3,14 +3,16 @@
 #include <time.h>
 #include <sys/time.h>
 #include <locale.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "menu.h"
 #include "game.h"
+#include "lost.h"
 
 #define TARGET_FRAME_TIME 0.01
 
-WINDOW *MenuWin, *GameWin;
+WINDOW *MenuWin, *GameWin, *LostWin;
 
 double deltaTime = 0;
 
@@ -19,19 +21,29 @@ void Draw(void);
 
 int main(int argc, char *argv[])
 {
-    // Init
     setlocale(LC_ALL, "");
 
-    // Setup ncurses screen
     initscr();
+
+	start_color();
+
+    init_pair(1, COLOR_RED, COLOR_BLACK);
+    init_pair(2, COLOR_GREEN, COLOR_BLACK);
+    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(4, COLOR_BLUE, COLOR_BLACK);
+    init_pair(5, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(6, COLOR_CYAN, COLOR_BLACK);
+    init_pair(7, COLOR_WHITE, COLOR_BLACK);
+
     clear();
     // raw();
     noecho();
     curs_set(0);
 
-    // Init ncurses windows
+
     int maxY, maxX;
     getmaxyx(stdscr, maxY, maxX);
+
     MenuWin = newwin(MENU_HEIGHT, MENU_WIDTH, (maxY - MENU_HEIGHT) / 2, (maxX - MENU_WIDTH) / 2);
     nodelay(MenuWin, TRUE);
     keypad(MenuWin, TRUE);
@@ -40,7 +52,11 @@ int main(int argc, char *argv[])
     nodelay(GameWin, TRUE);
     keypad(GameWin, TRUE);
 
-    // Init game obj
+    LostWin = newwin(LOST_HEIGHT, LOST_WIDTH, (maxY - LOST_HEIGHT) / 2, (maxX - LOST_WIDTH) / 2);
+    nodelay(LostWin, TRUE);
+    keypad(LostWin, TRUE);
+
+
     InitGame();
 
     long long start, frameTime;
@@ -75,9 +91,12 @@ int Update(void)
 
         case GAME:
             return UpdateGame(GameWin, deltaTime);
+
+        case LOST:
+            return UpdateLost(LostWin);
         
         default:
-            SetGameState(QUIT);
+            SetGameState(QUIT, NULL);
             return false;
     }
 }
@@ -96,9 +115,13 @@ void Draw(void)
         case GAME:
             DrawGame(GameWin);
             break;
+
+        case LOST:
+            DrawLost(LostWin);
+            break;
         
         default:
-            SetGameState(QUIT);
+            SetGameState(QUIT, NULL);
             break;
     }
 }

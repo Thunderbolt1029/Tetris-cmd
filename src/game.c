@@ -11,7 +11,9 @@
 #define DRAW_SCALE 2
 
 #define GAME_SPEED 0.5
-#define BAG_SIZE 7
+#define FLOOR_FRAMES 1
+#define BAG_SIZE 14
+#define PREDICT_COUNT 5
 
 #define LINE_SCORE_1 40
 #define LINE_SCORE_2 100
@@ -31,7 +33,6 @@ int LineScore(int noLines)
     }
 }
 
-
 typedef enum PieceType_type {
     T_PIECE,
     L_PIECE,
@@ -46,6 +47,7 @@ typedef enum PieceType_type {
 int score, linesCleared;
 int level[PLAY_HEIGHT + 2][PLAY_WIDTH];
 double moveDownTime;
+int touchFloorCount;
 
 PieceType currentPieceType;
 int currentRotation;
@@ -53,7 +55,7 @@ int currentPiece[4][2];
 
 int pieceFromBag;
 PieceType pieceBag[BAG_SIZE];
-
+PieceType nextBag[BAG_SIZE];
 
 void MoveTilesDown(int height);
 int MovePieceDown(void);
@@ -66,6 +68,8 @@ void AddPiece(PieceType);
 void RotatePiece(int dir);
 void RefreshBag(void);
 
+void DrawPiece(WINDOW* win, PieceType piece, int y, int x, int scale);
+
 
 void InitGame(void)
 {
@@ -73,6 +77,7 @@ void InitGame(void)
 
     score = 0;
     linesCleared = 0;
+    touchFloorCount = FLOOR_FRAMES;
 
     for (int x = 0; x < PLAY_WIDTH; x++)
         for (int y = 0; y < PLAY_HEIGHT+2; y++)
@@ -80,6 +85,7 @@ void InitGame(void)
 
     moveDownTime = GAME_SPEED;
 
+    RefreshBag();
     RefreshBag();
     AddPiece(pieceBag[pieceFromBag++]);
 }
@@ -98,6 +104,7 @@ int UpdateGame(WINDOW *win, double deltaTime)
         return false;
     }
 
+    int hard = false;
     switch (inp)
     {
     case KEY_DOWN:
@@ -106,6 +113,7 @@ int UpdateGame(WINDOW *win, double deltaTime)
         break;
     case ' ':
         HardDrop();
+        hard = true;
         drawFrame = true;
         break;
 
@@ -125,11 +133,12 @@ int UpdateGame(WINDOW *win, double deltaTime)
     }
 
     moveDownTime -= deltaTime;
-    if (moveDownTime < 0)
+    if (moveDownTime < 0 || hard)
     {
         moveDownTime = GAME_SPEED;
 
-        if (MovePieceDown()) 
+        int movePieceDown = MovePieceDown(); 
+        if (movePieceDown && (touchFloorCount-- <= 0 || hard)) 
         {
             int lines;
             lines = RemoveClearedLines();
@@ -152,6 +161,7 @@ int UpdateGame(WINDOW *win, double deltaTime)
                 return false;
             }
 
+            touchFloorCount == FLOOR_FRAMES;
             AddPiece(pieceBag[pieceFromBag++]);
             if (pieceFromBag == BAG_SIZE)
             {
@@ -159,6 +169,7 @@ int UpdateGame(WINDOW *win, double deltaTime)
                 RefreshBag();
             }
         }
+        if (!movePieceDown) touchFloorCount = FLOOR_FRAMES;
         drawFrame = true;
     }
 
@@ -167,20 +178,31 @@ int UpdateGame(WINDOW *win, double deltaTime)
 
 void DrawGame(WINDOW *win)
 {
+    int x, y, i;
     box(win, 0, 0);
+
+    int top, left, right;
+    getmidyx(win, PLAY_HEIGHT * DRAW_SCALE, PLAY_WIDTH * DRAW_SCALE * 2, top, left);
+    right = left + PLAY_WIDTH * DRAW_SCALE * 2;
+
 
     char Score[10];
     snprintf(Score, 10, "%d", score);
-    int i;
     for (i = 0; i < 10; i++)
         if (Score[i] == '\0') break;
     for (i--; i >= 0; i--)
         for (int j = 0; j < 4; j++)
                 mvwprintw(win, 1+j, 3+i*4, "%s", LargeNum(Score[i]-48, j));
 
-    int top, left;
-    getmidyx(win, PLAY_HEIGHT * DRAW_SCALE, PLAY_WIDTH * DRAW_SCALE * 2, top, left);
-    int y, x;
+
+    for (i = 0; i < PREDICT_COUNT; i++)
+    {
+        PieceType nextPieceType = pieceFromBag+i >= BAG_SIZE ? nextBag[(pieceFromBag+i) % BAG_SIZE] : pieceBag[pieceFromBag+i];
+        wattron(win, COLOR_PAIR(nextPieceType+1));
+        DrawPiece(win, nextPieceType, top+i*3, right+4, 1);
+        wattroff(win, COLOR_PAIR(nextPieceType+1));
+    }
+
 
     for (x = 0; x < PLAY_WIDTH * DRAW_SCALE * 2; x++)
     {
@@ -248,11 +270,12 @@ int MovePieceDown(void)
 void HardDrop(void)
 {
     while (!MovePieceDown()) {}
-    moveDownTime = 0;
 }
 
 void MovePieceLaterally(int dir)
 {
+    touchFloorCount == FLOOR_FRAMES;
+
     int x, y, i;
 
     for (i = 0; i < 4; i++)
@@ -427,6 +450,9 @@ void AddPiece(PieceType piece)
         currentPiece[3][1] = 5;
         break;
     }
+
+    for (int i = 0; i < 4; i++)
+        level[currentPiece[i][0]][currentPiece[i][1]] = currentPieceType + 1;
 }
 
 const int CLOCK_ROTATE_DISPLACEMENTS[7][4][4][2] = {
@@ -665,6 +691,11 @@ void RotatePiece(int dir)
 {
     int x, y, i;
 
+    int height = 0;
+    for (i = 0; i < 4; i++)
+        if (currentPiece[i][0] > height)
+            height = currentPiece[i][0];
+
     int levelCopy[PLAY_HEIGHT + 2][PLAY_WIDTH];
     for (y = 0; y < PLAY_HEIGHT+2; y++)
         for (x = 0; x < PLAY_WIDTH; x++)
@@ -708,6 +739,7 @@ void RotatePiece(int dir)
     if (kickTest == 4)
         return;
 
+    int floorKick = false;
     for (i = 0; i < 4; i++)
         level[currentPiece[i][0]][currentPiece[i][1]] = 0;
     for (i = 0; i < 4; i++)
@@ -719,19 +751,95 @@ void RotatePiece(int dir)
         {
             currentPiece[i][0] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][1];
             currentPiece[i][1] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][0];
+
+            floorKick = KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][1] < 0;
         }
     
         level[currentPiece[i][0]][currentPiece[i][1]] = currentPieceType + 1;
     }
     currentRotation++;
     currentRotation %= 4;
+
+    touchFloorCount == FLOOR_FRAMES; // change?
 }
 
 void RefreshBag(void)
 {
-    pieceFromBag = 0;
-    for (int i = 0; i < BAG_SIZE; i++)
-        pieceBag[i] = i%7;
+    int i;
 
-    shuffle((int*)pieceBag, BAG_SIZE);
+    pieceFromBag = 0;
+
+    for (i = 0; i < BAG_SIZE; i++)
+        pieceBag[i] = nextBag[i];
+
+    for (i = 0; i < BAG_SIZE; i++)
+        nextBag[i] = i%7;
+    shuffle((int*)nextBag, BAG_SIZE);
+}
+
+void DrawPiece(WINDOW* win, PieceType piece, int y, int x, int scale)
+{
+    for (int i = 0; i < scale; i++)
+    {
+        mvwaddstr(win, y, x, "        ");
+        mvwaddstr(win, y+1, x, "        ");
+    }
+
+    wattron(win, COLOR_PAIR(piece+1));
+
+    for (int dx = 0; dx < scale*2; dx++)
+        for (int dy = 0; dy < scale; dy++)
+    switch (piece)
+    {
+    case T_PIECE:
+        mvwaddch(win, y+dy+1*scale, x+dx, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy,         x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+2*scale*2, ' ' | A_REVERSE);
+        break;
+
+    case L_PIECE:
+        mvwaddch(win, y+dy+1*scale, x+dx, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+2*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy,         x+dx+2*scale*2, ' ' | A_REVERSE);
+        break;
+
+    case J_PIECE:
+        mvwaddch(win, y+dy,         x+dx, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+2*scale*2, ' ' | A_REVERSE);
+        break;
+
+    case I_PIECE:
+        mvwaddch(win, y+dy+1*scale, x+dx, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+2*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+3*scale*2, ' ' | A_REVERSE);
+        break;
+
+    case S_PIECE:
+        mvwaddch(win, y+dy+1*scale, x+dx, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy,         x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy,         x+dx+2*scale*2, ' ' | A_REVERSE);
+        break;
+
+    case Z_PIECE:
+        mvwaddch(win, y+dy,         x+dx, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy,         x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+2*scale*2, ' ' | A_REVERSE);
+        break;
+
+    case O_PIECE:
+        mvwaddch(win, y+dy,         x+dx, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy,         x+dx+1*scale*2, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx, ' ' | A_REVERSE);
+        mvwaddch(win, y+dy+1*scale, x+dx+1*scale*2, ' ' | A_REVERSE);
+        break;
+    }
+
+    wattron(win, COLOR_PAIR(piece+1));
 }

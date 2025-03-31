@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <locale.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 #include "common.h"
 #include "menu.h"
@@ -16,16 +17,68 @@ WINDOW *MenuWin, *GameWin, *LostWin;
 
 double deltaTime = 0;
 
+int noColoursFlag = 0;
+
 int Update(void);
 void Draw(void);
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
+    int c;
+    while (1)
+    {
+        int this_option_optind = optind ? optind : 1;
+        int option_index = 0;
+        struct option long_options[] = {
+            {"help", no_argument, 0, 'h'},
+            {"no-colour", no_argument, &noColoursFlag, 1},
+            {"stuff", required_argument, &noColoursFlag, 1},
+            {0, 0, 0, 0}
+        };
+
+        c = getopt_long(argc, argv, "h",
+                        long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c)
+        {
+        case 0:
+            printf("option %s", long_options[option_index].name);
+            if (optarg)
+                printf(" with arg %s", optarg);
+            printf("\n");
+            break;
+
+        case 'h':
+            printf("Some kind of help message\n");
+            break;
+
+        case '?':
+            break;
+
+        default:
+            printf("?? getopt returned character code 0%o ??\n", c);
+        }
+    }
+
+    if (optind < argc)
+    {
+        printf("non-option ARGV-elements: ");
+        while (optind < argc)
+            printf("%s ", argv[optind++]);
+        printf("\n");
+    }
+
+    printf("noColoursFlag: %d\n", noColoursFlag);
+
+
     setlocale(LC_ALL, "");
 
     initscr();
 
-	start_color();
+    if (!noColoursFlag)
+        start_color();
 
     init_pair(1, COLOR_RED, COLOR_BLACK);
     init_pair(2, COLOR_GREEN, COLOR_BLACK);

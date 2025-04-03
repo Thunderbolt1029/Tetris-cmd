@@ -22,17 +22,17 @@ int noColoursFlag = 0;
 int Update(void);
 void Draw(void);
 
+void ShowHelp(void);
+
 int main(int argc, char **argv)
 {
     int c;
     while (1)
     {
-        int this_option_optind = optind ? optind : 1;
         int option_index = 0;
         struct option long_options[] = {
             {"help", no_argument, 0, 'h'},
             {"no-colour", no_argument, &noColoursFlag, 1},
-            {"stuff", required_argument, &noColoursFlag, 1},
             {0, 0, 0, 0}
         };
 
@@ -51,14 +51,17 @@ int main(int argc, char **argv)
             break;
 
         case 'h':
-            printf("Some kind of help message\n");
+            ShowHelp();
+            exit(0);
             break;
 
         case '?':
+            ShowHelp();
+            exit(EXIT_FAILURE);
             break;
 
         default:
-            printf("?? getopt returned character code 0%o ??\n", c);
+            printf("?? getopt returned character code 0x%x:%c ??\n", c, c);
         }
     }
 
@@ -69,8 +72,6 @@ int main(int argc, char **argv)
             printf("%s ", argv[optind++]);
         printf("\n");
     }
-
-    printf("noColoursFlag: %d\n", noColoursFlag);
 
 
     setlocale(LC_ALL, "");
@@ -177,4 +178,9 @@ void Draw(void)
             SetGameState(QUIT, NULL);
             break;
     }
+}
+
+void ShowHelp(void)
+{
+    printf("usage: tetris [-h | --help] [--no-colour]\n\n");
 }

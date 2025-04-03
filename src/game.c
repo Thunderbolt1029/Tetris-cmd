@@ -9,6 +9,7 @@
 #define PLAY_WIDTH 10
 #define PLAY_HEIGHT 20
 #define DRAW_SCALE 2
+#define HOLD_BOX_SIZE 6
 
 #define GAME_SPEED 0.5
 #define FLOOR_FRAMES 1
@@ -34,6 +35,8 @@ int LineScore(int noLines)
 }
 
 typedef enum PieceType_type {
+    NONE = -1,
+
     T_PIECE,
     L_PIECE,
     J_PIECE,
@@ -57,6 +60,9 @@ int pieceFromBag;
 PieceType pieceBag[BAG_SIZE];
 PieceType nextBag[BAG_SIZE];
 
+PieceType heldPiece;
+
+
 void MoveTilesDown(int height);
 int MovePieceDown(void);
 void HardDrop(void);
@@ -69,6 +75,9 @@ void RotatePiece(int dir);
 void RefreshBag(void);
 
 void DrawPiece(WINDOW* win, PieceType piece, int y, int x, int scale);
+
+void HoldPiece(void);
+void AddPieceFromBag(void);
 
 
 void InitGame(void)
@@ -84,6 +93,8 @@ void InitGame(void)
             level[y][x] = 0;
 
     moveDownTime = GAME_SPEED;
+
+    heldPiece = NONE;
 
     RefreshBag();
     RefreshBag();
@@ -130,6 +141,11 @@ int UpdateGame(WINDOW *win, double deltaTime)
         RotatePiece(1);
         drawFrame = true;
         break;
+
+    case 'c':
+    case 'C':
+        HoldPiece();
+        break;
     }
 
     moveDownTime -= deltaTime;
@@ -162,12 +178,7 @@ int UpdateGame(WINDOW *win, double deltaTime)
             }
 
             touchFloorCount == FLOOR_FRAMES;
-            AddPiece(pieceBag[pieceFromBag++]);
-            if (pieceFromBag == BAG_SIZE)
-            {
-                pieceFromBag = 0;
-                RefreshBag();
-            }
+            AddPieceFromBag();
         }
         if (!movePieceDown) touchFloorCount = FLOOR_FRAMES;
         drawFrame = true;
@@ -194,12 +205,31 @@ void DrawGame(WINDOW *win)
         for (int j = 0; j < 4; j++)
                 mvwprintw(win, 1+j, 3+i*4, "%s", LargeNum(Score[i]-48, j));
 
+    for (i = 0; i < HOLD_BOX_SIZE; i++)
+    {
+        mvwaddch(win, top - 1,                 right + 3 + 2*i,   ACS_HLINE);
+        mvwaddch(win, top - 1,                 right + 3 + 2*i+1, ACS_HLINE);
+        mvwaddch(win, top - 1 + HOLD_BOX_SIZE, right + 3 + 2*i,   ACS_HLINE);
+        mvwaddch(win, top - 1 + HOLD_BOX_SIZE, right + 3 + 2*i+1, ACS_HLINE);
+
+        mvwaddch(win, top + i, right + 3,                   ACS_VLINE);
+        mvwaddch(win, top + i, right + 3 + HOLD_BOX_SIZE*2, ACS_VLINE);
+    }
+    mvwaddch(win, top - 1,                 right + 3,                   ACS_ULCORNER);
+    mvwaddch(win, top - 1,                 right + 3 + HOLD_BOX_SIZE*2, ACS_URCORNER);
+    mvwaddch(win, top - 1 + HOLD_BOX_SIZE, right + 3,                   ACS_LLCORNER);
+    mvwaddch(win, top - 1 + HOLD_BOX_SIZE, right + 3 + HOLD_BOX_SIZE*2, ACS_LRCORNER);
+    mvwprintw(win, top-1, right + 5, "Held");
+
+    if (heldPiece != -1)
+        DrawPiece(win, heldPiece, top + 1, right + 5, 1);
+
 
     for (i = 0; i < PREDICT_COUNT; i++)
     {
         PieceType nextPieceType = pieceFromBag+i >= BAG_SIZE ? nextBag[(pieceFromBag+i) % BAG_SIZE] : pieceBag[pieceFromBag+i];
         wattron(win, COLOR_PAIR(nextPieceType+1));
-        DrawPiece(win, nextPieceType, top+i*3, right+4, 1);
+        DrawPiece(win, nextPieceType, top+10+i*3, right+4, 1);
         wattroff(win, COLOR_PAIR(nextPieceType+1));
     }
 
@@ -842,4 +872,28 @@ void DrawPiece(WINDOW* win, PieceType piece, int y, int x, int scale)
     }
 
     wattron(win, COLOR_PAIR(piece+1));
+}
+
+void HoldPiece(void)
+{
+    PieceType temp = heldPiece;
+    heldPiece = currentPieceType;
+
+    for (int i = 0; i < 4; i++)
+        level[currentPiece[i][0]][currentPiece[i][1]] = 0;
+
+    if (temp == NONE)
+        AddPieceFromBag();
+    else
+        AddPiece(temp);
+}
+
+void AddPieceFromBag(void)
+{
+    AddPiece(pieceBag[pieceFromBag++]);
+    if (pieceFromBag == BAG_SIZE)
+    {
+        pieceFromBag = 0;
+        RefreshBag();
+    }
 }

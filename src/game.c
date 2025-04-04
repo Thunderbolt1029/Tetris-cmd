@@ -151,9 +151,12 @@ int UpdateGame(WINDOW *win, double deltaTime)
         RotatePiece(1);
         drawFrame = true;
         break;
+    case 'z':
+        RotatePiece(-1);
+        drawFrame = true;
+        break;
 
     case 'c':
-    case 'C':
         HoldPiece();
         drawFrame = true;
         break;
@@ -205,6 +208,9 @@ void DrawGame(WINDOW *win)
     int x, y, i;
     box(win, 0, 0);
     // mvwaddstr(win, 0, 2, "Game window");
+
+    mvprintw(0, 0, "%d ", currentRotation);
+    refresh();
 
     int top, left, right;
     getmidyx(win, PLAY_HEIGHT * DRAW_SCALE, PLAY_WIDTH * DRAW_SCALE * 2, top, left);
@@ -764,6 +770,9 @@ void RotatePiece(int dir)
 {
     int x, y, i;
 
+    int copyRotation = currentRotation;
+    if (dir < 0) copyRotation--;
+
     int height = 0;
     for (i = 0; i < 4; i++)
         if (currentPiece[i][0] > height)
@@ -790,13 +799,13 @@ void RotatePiece(int dir)
         int valid = true;
         for (i = 0; i < 4; i++)
         {
-            pieceCopy[i][0] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][1];
-            pieceCopy[i][1] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][0];
+            pieceCopy[i][0] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][copyRotation][i][1] * dir;
+            pieceCopy[i][1] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][copyRotation][i][0] * dir;
         
             if (kickTest != -1 && currentPieceType != O_PIECE) 
             {
-                pieceCopy[i][0] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][1];
-                pieceCopy[i][1] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][0];
+                pieceCopy[i][0] += KICK_CHECKS[currentPieceType == I_PIECE][copyRotation][kickTest][1] * dir;
+                pieceCopy[i][1] += KICK_CHECKS[currentPieceType == I_PIECE][copyRotation][kickTest][0] * dir;
             }
 
             int oobKick = pieceCopy[i][0] < 0 || pieceCopy[i][0] >= PLAY_HEIGHT + 2 || pieceCopy[i][1] < 0 || pieceCopy[i][1] >= PLAY_WIDTH;
@@ -812,28 +821,36 @@ void RotatePiece(int dir)
     if (kickTest == 4)
         return;
 
+    if (dir == -1)
+    {
+        currentRotation += 3;
+        currentRotation %= 4;
+    }
     int floorKick = false;
     for (i = 0; i < 4; i++)
         level[currentPiece[i][0]][currentPiece[i][1]] = 0;
     for (i = 0; i < 4; i++)
     {
-        currentPiece[i][0] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][1];
-        currentPiece[i][1] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][0];
-
+        currentPiece[i][0] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][1] * dir;
+        currentPiece[i][1] += CLOCK_ROTATE_DISPLACEMENTS[currentPieceType][currentRotation][i][0] * dir;
+    
         if (kickTest != -1 && currentPieceType != O_PIECE) 
         {
-            currentPiece[i][0] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][1];
-            currentPiece[i][1] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][0];
+            currentPiece[i][0] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][1] * dir;
+            currentPiece[i][1] += KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][0] * dir;
 
-            floorKick = KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][1] < 0;
+            floorKick = KICK_CHECKS[currentPieceType == I_PIECE][currentRotation][kickTest][1] * dir < 0;
         }
     
         level[currentPiece[i][0]][currentPiece[i][1]] = currentPieceType + 1;
     }
-    currentRotation++;
-    currentRotation %= 4;
+    if (dir == 1)
+    {
+        currentRotation++;
+        currentRotation %= 4;
+    }
 
-    touchFloorCount == FLOOR_FRAMES; // change?
+    touchFloorCount == FLOOR_FRAMES; // HACK: change?
 }
 
 void RefreshBag(void)

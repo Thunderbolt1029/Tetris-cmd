@@ -55,6 +55,7 @@
 #define LARGE_92 "|_  |"
 #define LARGE_93 "|___|"
 
+int Settings[NO_SETTINGS];
 
 GameState currentState = MENU;
 
@@ -116,15 +117,56 @@ char *LargeNum(int num, int i)
 
     switch (num)
     {
-    case 0: LARGE(0, i)
-    case 1: LARGE(1, i)
-    case 2: LARGE(2, i)
-    case 3: LARGE(3, i)
-    case 4: LARGE(4, i)
-    case 5: LARGE(5, i)
-    case 6: LARGE(6, i)
-    case 7: LARGE(7, i)
-    case 8: LARGE(8, i)
-    case 9: LARGE(9, i)
+    case 0: LARGE(0, i) break;
+    case 1: LARGE(1, i) break;
+    case 2: LARGE(2, i) break;
+    case 3: LARGE(3, i) break;
+    case 4: LARGE(4, i) break;
+    case 5: LARGE(5, i) break;
+    case 6: LARGE(6, i) break;
+    case 7: LARGE(7, i) break;
+    case 8: LARGE(8, i) break;
+    case 9: LARGE(9, i) break;
+    }
+}
+
+int buffI = 0;
+char buff[20];
+char *PrettifyInput(int input)
+{
+    if (input == -2) return "Changing";
+
+    if (input >= 33 && input <= 126) 
+    {
+        buffI += 2;
+        buffI %= 20;
+        char *s = buff+buffI;
+        s[0] = input;
+        s[1] = '\0';
+        return s;
+    }
+    if (input >= KEY_F0 && input <= KEY_F(12)) return "F Key";
+
+    switch (input)
+    {
+    case '\n': return "Enter";
+    case ' ': return "Space";
+
+    case KEY_BACKSPACE: return "Backspace";
+    case KEY_DL: return "Delete";
+    case KEY_DOWN: return "Down Arrow";
+    case KEY_END: return "End";
+    case KEY_ENTER: return "Enter";
+    case KEY_HOME: return "Home";
+    case KEY_IC: return "Insert";
+    case KEY_LEFT: return "Left Arrow";
+    case KEY_MOUSE: return "Mouse";
+    case KEY_NPAGE: return "Page Down";
+    case KEY_PPAGE: return "Page Up";
+    case KEY_RESIZE: return "Resized";
+    case KEY_RIGHT: return "Right Arrow";
+    case KEY_UP: return "Up Arrow";
+    
+    default: return "?";
     }
 }

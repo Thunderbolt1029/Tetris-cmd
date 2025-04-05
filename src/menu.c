@@ -14,21 +14,21 @@
 #define TETRIS_6 "   | |   | (____/\\   | |   | ) \\ \\_____) (___/\\____) |"
 #define TETRIS_7 "   )_(   (_______/   )_(   |/   \\__/\\_______/\\_______)"
 
-char *choices[] = {
+static char *choices[] = {
     "Start Game",
+    "Settings",
     "Quit"
 };
-GameState choiceStates[] = { GAME, QUIT };
+GameState choiceStates[] = { GAME, SETTINGS, QUIT };
 
-int selChoice = 0;
-int first = true;
+static int selChoice = 0;
 
 int UpdateMenu(WINDOW* win)
 {
-    int drawFrame = false;
-
     int inp;
     inp = wgetch(win);
+
+    if (inp == -1) return false;
 
     if (inp == 'q' || inp == 'Q')
     {
@@ -36,14 +36,11 @@ int UpdateMenu(WINDOW* win)
         return false;
     }
 
-    if (inp != -1)
-        drawFrame = true;
-
     switch (inp)
     {
     case KEY_UP:
-        selChoice--;
-        selChoice = mod(selChoice);
+        selChoice += ARRAY_LENGTH(choices)-1;
+        selChoice %= ARRAY_LENGTH(choices);
         break;
     case KEY_DOWN:
         selChoice++;
@@ -56,7 +53,7 @@ int UpdateMenu(WINDOW* win)
         break;
     }
 
-    return drawFrame;
+    return true;
 }
 
 void DrawMenu(WINDOW* win)

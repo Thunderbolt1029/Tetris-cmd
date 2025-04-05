@@ -10,10 +10,11 @@
 #include "menu.h"
 #include "game.h"
 #include "lost.h"
+#include "settings.h"
 
 #define TARGET_FRAME_TIME 0.01
 
-WINDOW *MenuWin, *GameWin, *LostWin;
+WINDOW *MenuWin, *GameWin, *LostWin, *SettingsWin;
 
 double deltaTime = 0;
 
@@ -74,6 +75,15 @@ int main(int argc, char **argv)
     }
 
 
+    Settings[MV_LEFT] = KEY_LEFT;
+    Settings[MV_RIGHT] = KEY_RIGHT;
+    Settings[SPIN] = KEY_UP;
+    Settings[ASPIN] = 'z';
+    Settings[SDROP] = KEY_DOWN;
+    Settings[HDROP] = ' ';
+    Settings[HOLD] = 'c';
+
+
     setlocale(LC_ALL, "");
 
     initscr();
@@ -109,6 +119,10 @@ int main(int argc, char **argv)
     LostWin = newwin(LOST_HEIGHT, LOST_WIDTH, (maxY - LOST_HEIGHT) / 2, (maxX - LOST_WIDTH) / 2);
     nodelay(LostWin, TRUE);
     keypad(LostWin, TRUE);
+
+    SettingsWin = newwin(SETTINGS_HEIGHT, SETTINGS_WIDTH, (maxY - SETTINGS_HEIGHT) / 2, (maxX - SETTINGS_WIDTH) / 2);
+    nodelay(SettingsWin, TRUE);
+    keypad(SettingsWin, TRUE);
 
 
     InitGame();
@@ -148,6 +162,9 @@ int Update(void)
 
         case LOST:
             return UpdateLost(LostWin);
+
+        case SETTINGS:
+            return UpdateSettings(SettingsWin);
         
         default:
             SetGameState(QUIT, NULL);
@@ -172,6 +189,10 @@ void Draw(void)
 
         case LOST:
             DrawLost(LostWin);
+            break;
+        
+        case SETTINGS:
+            DrawSettings(SettingsWin);
             break;
         
         default:

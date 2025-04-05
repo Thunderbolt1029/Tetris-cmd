@@ -126,40 +126,44 @@ int UpdateGame(WINDOW *win, double deltaTime)
     }
 
     int hard = false;
-    switch (inp)
+    if (inp == Settings[SDROP])
     {
-    case KEY_DOWN:
         MovePieceDown();
         drawFrame = true;
-        break;
-    case ' ':
+    }
+    else if (inp == Settings[HDROP])
+    {
         HardDrop();
         hard = true;
         drawFrame = true;
-        break;
-
-    case KEY_LEFT:
+    }
+    
+    else if (inp == Settings[MV_LEFT])
+    {
         MovePieceLaterally(-1);
         drawFrame = true;
-        break;
-    case KEY_RIGHT:
+    }
+    else if (inp == Settings[MV_RIGHT])
+    {
         MovePieceLaterally(1);
         drawFrame = true;
-        break;
+    }
 
-    case KEY_UP:
+    else if (inp == Settings[SPIN])
+    {
         RotatePiece(1);
         drawFrame = true;
-        break;
-    case 'z':
+    }
+    else if (inp == Settings[ASPIN])
+    {
         RotatePiece(-1);
         drawFrame = true;
-        break;
+    }
 
-    case 'c':
+    else if (inp == Settings[HOLD])
+    {
         HoldPiece();
         drawFrame = true;
-        break;
     }
 
     moveDownTime -= deltaTime;
@@ -208,9 +212,6 @@ void DrawGame(WINDOW *win)
     int x, y, i;
     box(win, 0, 0);
     // mvwaddstr(win, 0, 2, "Game window");
-
-    mvprintw(0, 0, "%d ", currentRotation);
-    refresh();
 
     int top, left, right;
     getmidyx(win, PLAY_HEIGHT * DRAW_SCALE, PLAY_WIDTH * DRAW_SCALE * 2, top, left);

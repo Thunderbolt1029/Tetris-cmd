@@ -17,7 +17,8 @@ typedef enum GameState_type
     QUIT,
     MENU,
     GAME,
-    LOST
+    LOST,
+    SETTINGS
 } GameState;
 
 typedef struct GameInfo_type
@@ -26,6 +27,13 @@ typedef struct GameInfo_type
     int lines;
     // time?
 } GameInfo;
+
+#define NO_SETTINGS 7
+enum Setting_type
+{
+    MV_LEFT, MV_RIGHT, SPIN, ASPIN, SDROP, HDROP, HOLD
+};
+extern int Settings[NO_SETTINGS];
 
 int SwitchedState(void);
 GameState GetGameState(void);
@@ -36,5 +44,7 @@ long long timeInMilliseconds(void);
 void shuffle(int *array, size_t arraySize);
 
 char *LargeNum(int num, int i);
+
+char *PrettifyInput(int input);
 
 #endif

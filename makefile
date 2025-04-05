@@ -3,8 +3,8 @@ CC     = gcc
 CFLAGS = -W -O
 LDLIBS = -lm -lncursesw
 
-tetris: obj/main.o obj/common.o obj/menu.o obj/game.o obj/lost.o
-	$(CC) $(LDFLAGS) -o tetris obj/main.o obj/common.o obj/menu.o obj/game.o obj/lost.o $(LDLIBS)
+tetris: obj/main.o obj/common.o obj/menu.o obj/game.o obj/lost.o obj/settings.o
+	$(CC) $(LDFLAGS) -o tetris obj/main.o obj/common.o obj/menu.o obj/game.o obj/lost.o obj/settings.o $(LDLIBS)
 
 obj/main.o: src/main.c src/menu.h src/game.h src/common.h
 	$(CC) $(CFLAGS) -c src/main.c -o obj/main.o
@@ -20,3 +20,6 @@ obj/game.o: src/game.c src/game.h src/common.h
 
 obj/lost.o: src/lost.c src/lost.h src/common.h
 	$(CC) $(CFLAGS) -c src/lost.c -o obj/lost.o
+
+obj/settings.o: src/settings.c src/settings.h src/common.h
+	$(CC) $(CFLAGS) -c src/settings.c -o obj/settings.o
